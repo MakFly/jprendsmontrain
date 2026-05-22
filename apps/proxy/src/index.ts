@@ -9,6 +9,7 @@ import { reservationRoutes } from "./routes/reservation.js";
 import { subscriptionRoutes } from "./routes/subscription.js";
 import { customerRoutes } from "./routes/customer.js";
 import { refdataRoutes } from "./routes/refdata.js";
+import { bridgeRoutes } from "./routes/bridge.js";
 
 const app = new Hono()
   .use("*", logger())
@@ -20,7 +21,8 @@ const app = new Hono()
   .route("/reservation", reservationRoutes)
   .route("/subscription", subscriptionRoutes)
   .route("/customer", customerRoutes)
-  .route("/refdata", refdataRoutes);
+  .route("/refdata", refdataRoutes)
+  .route("/bridge", bridgeRoutes);
 
 console.log(`MAX SNCF Proxy running on http://localhost:${config.port}`);
 
