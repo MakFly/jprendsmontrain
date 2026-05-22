@@ -8,4 +8,5 @@ dist/
 *.jpeg
 *.gif
 *.webp
+.next/
 .DS_Store
