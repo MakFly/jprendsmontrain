@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+.DS_Store
