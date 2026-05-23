@@ -5,7 +5,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { authApi } from "@/lib/api/auth";
 import { customerApi } from "@/lib/api/customer";
 import { useRouter } from "next/navigation";
-import { LogOut, User } from "lucide-react";
+import { LogOut, Shield, User } from "lucide-react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 export default function ProfilePage() {
@@ -97,6 +98,14 @@ export default function ProfilePage() {
           <LogOut className="h-5 w-5" />
           Se déconnecter
         </button>
+
+        <Link
+          href="/privacy"
+          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl border border-border text-sm font-medium text-muted-foreground transition-colors active:bg-muted"
+        >
+          <Shield className="h-4 w-4" />
+          Politique de confidentialite
+        </Link>
 
         <p className="pt-1 text-center text-xs text-muted-foreground">
           MAX SNCF · TGV INOUI

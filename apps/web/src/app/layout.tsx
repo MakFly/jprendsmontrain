@@ -7,6 +7,7 @@ import {
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { PwaRegister } from "@/components/pwa-register";
+import { CookieBanner } from "@/components/cookie-banner";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -79,6 +80,7 @@ export default function RootLayout({
         <ThemeProvider>
           <QueryProvider>{children}</QueryProvider>
           <PwaRegister />
+          <CookieBanner />
         </ThemeProvider>
       </body>
     </html>
