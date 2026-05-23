@@ -103,9 +103,9 @@ export const authRoutes = new Hono()
 
     setCookie(c, SESSION_COOKIE_NAME, jwt, {
       httpOnly: true,
-      secure: config.cookieDomain !== "localhost",
+      secure: config.cookieSecure,
       sameSite: "Lax",
-      domain: config.cookieDomain,
+      domain: config.cookieDomainAttr,
       path: "/",
       maxAge: 86400,
     });
@@ -117,6 +117,11 @@ export const authRoutes = new Hono()
     const session = c.get("session");
     const correlationId = c.get("correlationId");
 
+    if (session.imported) {
+      sessionStore.touch(session.id);
+      return c.json({ success: true, mode: "imported" });
+    }
+
     const result = await sncfFetch(API_PATHS.AUTH_REFRESH, {
       method: "POST",
       session,
@@ -124,9 +129,12 @@ export const authRoutes = new Hono()
     });
 
     if (result.status !== 200) {
-      sessionStore.destroy(session.id);
-      deleteCookie(c, SESSION_COOKIE_NAME);
-      return c.json({ error: "REFRESH_FAILED", message: "Session refresh failed" }, 401);
+      // A failed refresh must NOT destroy the session: the existing `auth`
+      // cookie may still be valid for data calls (and DataDome can 403 the
+      // refresh endpoint server-side even when the session is fine). Keep the
+      // session alive; real invalidity surfaces as 401s on actual data calls.
+      sessionStore.touch(session.id);
+      return c.json({ success: true, mode: "live", refreshed: false });
     }
 
     if (result.setCookies.length > 0) {
@@ -137,8 +145,9 @@ export const authRoutes = new Hono()
         xsrfToken: newXsrf,
       });
     }
+    sessionStore.touch(session.id);
 
-    return c.json({ success: true });
+    return c.json({ success: true, mode: "live" });
   })
 
   .get("/logout", requireSession, async (c) => {
@@ -172,5 +181,9 @@ export const authRoutes = new Hono()
     }
 
     const session = sessionStore.get(payload.sid);
-    return c.json({ authenticated: !!session });
+    return c.json({
+      authenticated: !!session,
+      mode: session?.imported ? "imported" : session ? "live" : undefined,
+      expiresAt: session?.expiresAt,
+    });
   });

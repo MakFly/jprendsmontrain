@@ -10,6 +10,12 @@ import { subscriptionRoutes } from "./routes/subscription.js";
 import { customerRoutes } from "./routes/customer.js";
 import { refdataRoutes } from "./routes/refdata.js";
 import { bridgeRoutes } from "./routes/bridge.js";
+import {
+  mirrorApp,
+  mirrorIdpApp,
+  MIRROR_PORT,
+  MIRROR_IDP_PORT,
+} from "./routes/sncf-mirror.js";
 
 const app = new Hono()
   .use("*", logger())
@@ -25,6 +31,15 @@ const app = new Hono()
   .route("/bridge", bridgeRoutes);
 
 console.log(`MAX SNCF Proxy running on http://localhost:${config.port}`);
+
+// Whole-origin reverse-proxy mirrors for the mobile login flow. Each SNCF
+// domain is served at the root of its own port so the SPA router + root-relative
+// assets work, and links between the two are cross-rewritten.
+Bun.serve({ port: MIRROR_PORT, fetch: mirrorApp.fetch, idleTimeout: 60 });
+Bun.serve({ port: MIRROR_IDP_PORT, fetch: mirrorIdpApp.fetch, idleTimeout: 60 });
+console.log(
+  `SNCF login mirror on http://localhost:${MIRROR_PORT} (app) + :${MIRROR_IDP_PORT} (idp)`,
+);
 
 export default {
   port: config.port,

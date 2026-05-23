@@ -1,0 +1,68 @@
+name: max-sncf
+
+# Production stack for a VPS. Caddy terminates TLS (auto Let's Encrypt) and
+# routes the app + API subdomains to the internal services. All config comes
+# from a local `.env` (copy .env.production.example → .env and fill it in).
+
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: apps/proxy/Dockerfile
+    environment:
+      PORT: "3333"
+      MIRROR_PORT: "3344"
+      MIRROR_IDP_PORT: "3345"
+      SESSION_STORE_FILE: /data/sessions.json
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      SNCF_BACKEND_URL: ${SNCF_BACKEND_URL:-https://www.maxactif-tgvinoui.sncf}
+      # CORS allowlist — the public app origin(s), comma-separated.
+      PWA_ORIGINS: ${PWA_ORIGINS:?set PWA_ORIGINS in .env}
+      # Parent domain so the session cookie is shared app.<d> ↔ api.<d> (e.g. .example.com)
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:?set COOKIE_DOMAIN in .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      APP_VERSION: ${APP_VERSION:-2.54.2}
+      MIRROR_HOST: ${MIRROR_HOST:-}
+    volumes:
+      - proxy-data:/data
+    expose:
+      - "3333"
+      - "3344"
+      - "3345"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # NEXT_PUBLIC_* are inlined at build time — rebuild after changing them.
+        NEXT_PUBLIC_PROXY_URL: ${NEXT_PUBLIC_PROXY_URL:?set NEXT_PUBLIC_PROXY_URL in .env}
+        NEXT_PUBLIC_MIRROR_URL: ${NEXT_PUBLIC_MIRROR_URL:-}
+    expose:
+      - "3020"
+    depends_on:
+      - proxy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in .env}
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - proxy
+    restart: unless-stopped
+
+volumes:
+  proxy-data:
+  caddy-data:
+  caddy-config:

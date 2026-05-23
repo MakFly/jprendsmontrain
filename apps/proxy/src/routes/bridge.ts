@@ -1,14 +1,211 @@
-import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
+import { Hono, type Context } from "hono";
+import { Buffer } from "node:buffer";
+import { getCookie, setCookie } from "hono/cookie";
 import { config } from "../config.js";
 import { SESSION_COOKIE_NAME } from "@max-sncf/shared";
-import { signSessionToken } from "../lib/crypto.js";
-import { sessionStore } from "../lib/session-store.js";
+import { signSessionToken, verifySessionToken } from "../lib/crypto.js";
+import { sessionStore, type ImportedSessionData } from "../lib/session-store.js";
 import { extractXsrfToken } from "../lib/sncf-client.js";
 
 const SNCF_ORIGIN = "https://www.maxactif-tgvinoui.sncf";
 
+// ---------------------------------------------------------------------------
+// Device pairing: copy an existing live session onto another device (the phone)
+// without re-logging-in there. The source device (already authenticated) mints
+// a short-lived one-time code; the phone opens /bridge/pair?code=… (e.g. via a
+// QR), which signs a fresh session cookie for the SAME server-side session and
+// redirects into the PWA. Sessions are server-side, so several devices can
+// safely share one sid for a personal account.
+// ---------------------------------------------------------------------------
+const pairCodes = new Map<string, { sid: string; exp: number }>();
+function newPairCode(sid: string): string {
+  const code = crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+  pairCodes.set(code, { sid, exp: Date.now() + 5 * 60_000 });
+  return code;
+}
+
+async function createImportedSession(c: Context, imported: ImportedSessionData) {
+  const session = sessionStore.createImported({
+    ...imported,
+    source: "browser",
+    importedAt: new Date().toISOString(),
+  });
+  const jwt = await signSessionToken(session.id);
+
+  setCookie(c, SESSION_COOKIE_NAME, jwt, {
+    httpOnly: true,
+    secure: config.cookieSecure,
+    sameSite: "Lax",
+    domain: config.cookieDomainAttr,
+    path: "/",
+    maxAge: 86400,
+  });
+
+  return c.redirect(config.pwaOrigin);
+}
+
+interface LiveSessionPayload {
+  cookies: Record<string, string> | string[];
+  userAgent?: string;
+  cardNumber?: string;
+}
+
+function toCookieArray(cookies: Record<string, string> | string[]): string[] {
+  if (Array.isArray(cookies)) return cookies.filter(Boolean);
+  return Object.entries(cookies)
+    .filter(([, v]) => Boolean(v))
+    .map(([name, value]) => `${name}=${value}`);
+}
+
 export const bridgeRoutes = new Hono()
+  // Create a LIVE session from cookies harvested in a real browser
+  // (auth + datadome) plus the exact User-Agent the datadome cookie was issued
+  // for. This is the only way to make authenticated/mutating SNCF calls
+  // (book / exchange / cancel) work server-side past DataDome.
+  .post("/session", async (c) => {
+    const payload = (await c.req.json().catch(() => null)) as LiveSessionPayload | null;
+    if (!payload?.cookies) {
+      return c.json({ error: "MISSING_COOKIES" }, 400);
+    }
+
+    const sncfCookies = toCookieArray(payload.cookies);
+    const hasAuth = sncfCookies.some((ck) => ck.startsWith("auth="));
+    const hasDatadome = sncfCookies.some((ck) => ck.startsWith("datadome="));
+    if (!hasAuth || !hasDatadome) {
+      return c.json(
+        { error: "INCOMPLETE_SESSION", message: "Both `auth` and `datadome` cookies are required." },
+        400,
+      );
+    }
+
+    const xsrfToken = extractXsrfToken(sncfCookies);
+    const session = sessionStore.create(sncfCookies, xsrfToken, payload.userAgent);
+    // Cache the card number up front (the harvesting client knows it) so the
+    // proxy never needs an extra read-customer round-trip — fewer requests means
+    // less chance of tripping DataDome's burst detection.
+    if (payload.cardNumber) {
+      sessionStore.update(session.id, { cardNumber: payload.cardNumber });
+    }
+    const jwt = await signSessionToken(session.id);
+
+    setCookie(c, SESSION_COOKIE_NAME, jwt, {
+      httpOnly: true,
+      secure: config.cookieSecure,
+      sameSite: "Lax",
+      domain: config.cookieDomainAttr,
+      path: "/",
+      maxAge: 86400,
+    });
+
+    return c.json({ success: true, mode: "live" });
+  })
+
+  // Source device (authenticated): mint a one-time pairing code for the phone.
+  .get("/pair-start", async (c) => {
+    const token = getCookie(c, SESSION_COOKIE_NAME);
+    const payload = token ? await verifySessionToken(token) : null;
+    const session = payload ? sessionStore.get(payload.sid) : null;
+    if (!session) return c.json({ error: "NO_SESSION" }, 401);
+    const code = newPairCode(session.id);
+    const pairUrl = `${new URL(c.req.url).origin}/bridge/pair?code=${code}`;
+    return c.json({ code, pairUrl, expiresInSec: 300 });
+  })
+
+  // Target device (the phone): redeem the code → session cookie → into the PWA.
+  .get("/pair", async (c) => {
+    const code = c.req.query("code")?.toUpperCase() ?? "";
+    const entry = pairCodes.get(code);
+    if (!entry || entry.exp < Date.now()) {
+      pairCodes.delete(code);
+      return c.html(
+        `<body style="font:16px system-ui;padding:24px;color:#991b1b">Code d'appairage invalide ou expiré.</body>`,
+        400,
+      );
+    }
+    pairCodes.delete(code); // one-time use
+    const session = sessionStore.get(entry.sid);
+    if (!session) {
+      return c.html(
+        `<body style="font:16px system-ui;padding:24px;color:#991b1b">Session source expirée. Reconnectez-vous sur l'appareil d'origine.</body>`,
+        410,
+      );
+    }
+    const jwt = await signSessionToken(session.id);
+    setCookie(c, SESSION_COOKIE_NAME, jwt, {
+      httpOnly: true,
+      secure: config.cookieSecure,
+      sameSite: "Lax",
+      domain: config.cookieDomainAttr,
+      path: "/",
+      maxAge: 86400,
+    });
+    return c.redirect(config.pwaOrigin);
+  })
+
+  .get("/import", async (c) => {
+    const payload = c.req.query("payload");
+    if (payload) {
+      try {
+        const parsed = JSON.parse(
+          Buffer.from(payload, "base64url").toString("utf8"),
+        ) as ImportedSessionData;
+        return createImportedSession(c, parsed);
+      } catch {
+        return c.text("Invalid import payload", 400);
+      }
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MAX SNCF — Import navigateur</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #0f172a; }
+    main { width: min(100%, 32rem); background: white; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1.25rem; box-shadow: 0 10px 30px rgba(15,23,42,0.08); }
+    h1 { margin: 0 0 0.375rem; color: #00214D; font-size: 1.25rem; }
+    p { margin: 0 0 1rem; color: #475569; line-height: 1.45; }
+    label { display: block; margin-bottom: 0.375rem; font-size: 0.8125rem; font-weight: 700; color: #334155; }
+    textarea { width: 100%; min-height: 14rem; resize: vertical; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 0.75rem; font: 0.8125rem ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    button { width: 100%; min-height: 44px; margin-top: 0.875rem; border: 0; border-radius: 0.5rem; background: #00214D; color: white; font-weight: 700; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Import navigateur MAX SNCF</h1>
+    <p>Collez les donnees extraites depuis votre session SNCF deja connectee. Le proxy creera une session locale PWA sans stocker vos identifiants.</p>
+    <form method="post" action="/bridge/import">
+      <label for="payload">Donnees de session</label>
+      <textarea id="payload" name="payload" required autofocus></textarea>
+      <button type="submit">Connecter la PWA</button>
+    </form>
+  </main>
+</body>
+</html>`;
+
+    return c.html(html);
+  })
+
+  .post("/import", async (c) => {
+    const body = await c.req.parseBody();
+    const raw = body.payload;
+
+    if (typeof raw !== "string" || raw.trim().length === 0) {
+      return c.text("Payload missing", 400);
+    }
+
+    let parsed: ImportedSessionData;
+    try {
+      parsed = JSON.parse(raw) as ImportedSessionData;
+    } catch {
+      return c.text("Payload must be valid JSON", 400);
+    }
+
+    return createImportedSession(c, parsed);
+  })
+
   .get("/login", (c) => {
     const html = `<!DOCTYPE html>
 <html lang="fr">

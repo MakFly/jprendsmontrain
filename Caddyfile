@@ -1,0 +1,24 @@
+# Auto-HTTPS reverse proxy. Domains come from the env (APP_DOMAIN / API_DOMAIN).
+# Caddy obtains + renews Let's Encrypt certs automatically (ports 80/443 open).
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3020
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy proxy:3333
+}
+
+# ── Optional: mobile no-copy-paste login mirror ──────────────────────────
+# The mirror reverse-proxies SNCF origins for the mobile login flow. To enable
+# it, give it its own subdomains, expose them here, and set NEXT_PUBLIC_MIRROR_URL
+# + MIRROR_HOST in .env. Left commented because the standard login works without it.
+#
+# {$MIRROR_DOMAIN} {
+# 	reverse_proxy proxy:3344
+# }
+# {$MIRROR_IDP_DOMAIN} {
+# 	reverse_proxy proxy:3345
+# }

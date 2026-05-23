@@ -10,3 +10,12 @@ dist/
 *.webp
 .next/
 .DS_Store
+
+# TS incremental build info (build artifact)
+*.tsbuildinfo
+
+# Playwright MCP scratch output (snapshots / console logs)
+.playwright-mcp/
+
+# instant-grep index
+.ig/

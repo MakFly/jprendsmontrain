@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const TITLES: Record<string, string> = {
   "/": "MAX SNCF",
@@ -17,8 +18,13 @@ export function Header() {
   const title = TITLES[pathname] ?? "MAX SNCF";
 
   return (
-    <header className="sticky top-0 z-40 flex h-[var(--navbar-h)] items-center border-b border-border bg-card/95 px-4 backdrop-blur-sm">
-      <h1 className="text-lg font-bold text-foreground">{title}</h1>
+    <header className="sticky top-0 z-40 border-b border-border bg-card pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex h-[var(--navbar-h)] max-w-lg items-center justify-between px-4">
+        <h1 className="font-display text-xl font-bold tracking-tight text-foreground">
+          {title}
+        </h1>
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

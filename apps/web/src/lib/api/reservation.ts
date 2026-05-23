@@ -1,7 +1,14 @@
 import { api } from "../api-client";
 
 export const reservationApi = {
-  searchTravels: (params: { origin: string; destination: string; departureDate: string }) =>
+  searchTravels: (params: {
+    origin: string;
+    destination: string;
+    departureDate: string;
+    preferredTime?: string;
+    preferenceDay?: string;
+    direction?: "outbound" | "return";
+  }) =>
     api.post<{ travels: unknown[] }>("/reservation/search-travels", params),
   bookTravel: (params: unknown) =>
     api.post("/reservation/book-travels", params),
@@ -11,6 +18,8 @@ export const reservationApi = {
     api.post<{ travels: unknown[] }>("/reservation/travel-consultation", {}),
   getTravel: (travelId: string) =>
     api.post("/reservation/get-travel", { travelId }),
+  printTravel: (travelId: string) =>
+    api.post<Record<string, unknown>>("/reservation/print-travel", { travelId }),
   readPreferences: () =>
     api.post("/reservation/read-preferences", {}),
   updatePreferences: (prefs: unknown) =>

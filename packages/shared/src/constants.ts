@@ -4,7 +4,9 @@ export const SNCF_BACKEND_URL =
 export const SNCF_AUTH_DOMAIN = "https://monidentifiant.sncf";
 
 export const CLIENT_APP = "MAX_ACTIF";
-export const DISTRIBUTION_CHANNEL = "SNCF-CONNECT";
+// The live MAX ACTIF web app sends "OUI" (verified against real API traffic).
+// "SNCF-CONNECT" was rejected/captcha'd.
+export const DISTRIBUTION_CHANNEL = "OUI";
 
 export const SNCF_HEADERS = {
   CLIENT_APP: "x-client-app",

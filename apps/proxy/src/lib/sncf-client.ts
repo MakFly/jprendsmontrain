@@ -16,18 +16,50 @@ export interface SncfResponse {
   captchaUrl?: string;
 }
 
-const BROWSER_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
-  "Sec-CH-UA": '"Chromium";v="129", "Google Chrome";v="129", "Not=A?Brand";v="8"',
-  "Sec-CH-UA-Mobile": "?1",
-  "Sec-CH-UA-Platform": '"Android"',
-  "Sec-Fetch-Dest": "empty",
-  "Sec-Fetch-Mode": "cors",
-  "Sec-Fetch-Site": "same-origin",
-  Referer: "https://www.maxactif-tgvinoui.sncf/sncf-connect",
-  Origin: "https://www.maxactif-tgvinoui.sncf",
-};
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36";
+
+/**
+ * DataDome binds its cookie to the User-Agent it was issued for. A live
+ * session captured from a real browser carries that browser's UA; we MUST
+ * replay it (and consistent Client Hints) or DataDome returns a 403 captcha
+ * even with a valid `datadome` cookie.
+ */
+function browserHeaders(userAgent?: string): Record<string, string> {
+  const ua = userAgent || DEFAULT_USER_AGENT;
+  const headers: Record<string, string> = {
+    "User-Agent": ua,
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "Accept-Language": "fr-FR,fr;q=0.9",
+    Referer: "https://www.maxactif-tgvinoui.sncf/sncf-connect/mes-voyages",
+    Origin: "https://www.maxactif-tgvinoui.sncf",
+  };
+
+  // Sec-CH-UA* (Client Hints) are a Chromium-on-desktop/Android feature. iOS
+  // browsers — Safari AND Chrome/CriOS, both WebKit — send NONE of them. Pairing
+  // desktop-Chrome hints (and a "Linux" platform!) with an iPhone UA is an
+  // obvious spoof signal that made DataDome 403/captcha every iOS session while
+  // Mac sessions passed. So only emit hints for a genuine Chromium UA, never iOS.
+  const isIOS = /iPhone|iPad|iPod|CriOS|FxiOS|EdgiOS/.test(ua);
+  const chromeMajor = ua.match(/Chrome\/(\d+)/)?.[1];
+  if (!isIOS && chromeMajor) {
+    const platform = ua.includes("Macintosh")
+      ? "macOS"
+      : ua.includes("Windows")
+        ? "Windows"
+        : ua.includes("Android")
+          ? "Android"
+          : "Linux";
+    headers["Sec-CH-UA"] =
+      `"Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}", "Not/A)Brand";v="99"`;
+    headers["Sec-CH-UA-Mobile"] = ua.includes("Mobile") ? "?1" : "?0";
+    headers["Sec-CH-UA-Platform"] = `"${platform}"`;
+  }
+
+  return headers;
+}
 
 let dataDomeCookies: string[] = [];
 
@@ -57,23 +89,37 @@ export async function sncfFetch(
     [SNCF_HEADERS.CLIENT_APP_VERSION]: config.appVersion,
     [SNCF_HEADERS.DISTRIBUTION_CHANNEL]: DISTRIBUTION_CHANNEL,
     [SNCF_HEADERS.CORRELATION_ID]: options.correlationId,
-    ...BROWSER_HEADERS,
+    ...browserHeaders(options.session?.userAgent),
   });
 
+  // Global DataDome cookies seed the pre-auth flow. Session cookies come last
+  // so that a live session's own `datadome`/`auth` win over any globally
+  // captured (possibly captcha-tainted) value during de-duplication.
   const cookieParts: string[] = [...dataDomeCookies];
 
   if (options.session) {
     headers.set(SNCF_HEADERS.CLIENT_AUTH, "true");
-    headers.set(SNCF_HEADERS.XSRF_TOKEN, options.session.xsrfToken);
+    // The live web app does not send X-XSRF-TOKEN; only set it if we actually
+    // captured one (legacy flow). Auth is carried by the `auth` cookie.
+    if (options.session.xsrfToken) {
+      headers.set(SNCF_HEADERS.XSRF_TOKEN, options.session.xsrfToken);
+    }
     cookieParts.push(...options.session.sncfCookies);
   }
 
   if (cookieParts.length > 0) {
-    const cookieValues = cookieParts.map((c) => {
-      const nv = c.split(";")[0];
-      return nv?.trim() ?? "";
-    }).filter(Boolean);
-    headers.set("Cookie", cookieValues.join("; "));
+    // De-duplicate by cookie name, last value wins (session over global).
+    const byName = new Map<string, string>();
+    for (const c of cookieParts) {
+      const nv = c.split(";")[0]?.trim();
+      if (!nv) continue;
+      const eq = nv.indexOf("=");
+      if (eq <= 0) continue;
+      byName.set(nv.slice(0, eq).trim(), nv);
+    }
+    if (byName.size > 0) {
+      headers.set("Cookie", Array.from(byName.values()).join("; "));
+    }
   }
 
   const response = await fetch(url, {

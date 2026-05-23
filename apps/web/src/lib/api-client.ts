@@ -24,6 +24,25 @@ export function onCaptchaRequired(handler: CaptchaHandler) {
   captchaHandler = handler;
 }
 
+type SessionExpiredHandler = () => void;
+let sessionExpiredHandler: SessionExpiredHandler | null = null;
+
+// Notified whenever the proxy answers 401 — i.e. the captured SNCF cookies
+// rotated and the session can no longer read the account. Lets the app prompt
+// a re-login instead of letting read pages render a misleading empty state.
+export function onSessionExpired(handler: SessionExpiredHandler) {
+  sessionExpiredHandler = handler;
+}
+
+type SessionOkHandler = () => void;
+let sessionOkHandler: SessionOkHandler | null = null;
+
+// Notified on any successful data response: proof the session can read SNCF
+// again, so a previously-shown "expired/captcha" banner can be dismissed.
+export function onSessionOk(handler: SessionOkHandler) {
+  sessionOkHandler = handler;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${PROXY_URL}${path}`, {
     ...options,
@@ -47,10 +66,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new CaptchaError(captchaUrl);
   }
 
+  if (response.status === 401) {
+    sessionExpiredHandler?.();
+  }
+
   if (!response.ok) {
     throw new ApiError(response.status, data);
   }
 
+  sessionOkHandler?.();
   return data as T;
 }
 

@@ -4,12 +4,13 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import { Train } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL || "http://localhost:3333";
+const MIRROR_URL = process.env.NEXT_PUBLIC_MIRROR_URL || "http://localhost:3344";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { status, checkStatus } = useAuthStore();
+  const { status, mode, checkStatus } = useAuthStore();
 
   useEffect(() => {
     checkStatus();
@@ -19,10 +20,13 @@ export default function LoginPage() {
     if (status === "authenticated") {
       router.replace("/");
     }
-  }, [status, router]);
+  }, [status, mode, router]);
 
   function handleLogin() {
-    window.location.href = `${PROXY_URL}/bridge/login`;
+    // Mobile login: open the SNCF site served through our whole-origin mirror.
+    // The user logs in there; the mirror captures auth+datadome and the
+    // "revenir à MAX SNCF" button hands a ready session back to the PWA.
+    window.location.href = `${MIRROR_URL}/sncf-connect`;
   }
 
   return (
@@ -41,16 +45,24 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-3">
-          <button
+          {mode === "imported" && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">
+              Vous etes en apercu importe. Pour reserver ou annuler sur le compte SNCF,
+              connectez une session live.
+            </div>
+          )}
+
+          <Button
             onClick={handleLogin}
-            className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-sncf-navy px-6 py-3 font-semibold text-white transition-opacity hover:opacity-90"
+            className="w-full rounded-xl"
           >
-            Se connecter via SNCF
-          </button>
+            Se connecter en live SNCF
+          </Button>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
-          Vous serez redirige vers le site SNCF pour vous connecter en toute securite
+          La session live garde les cookies SNCF cote proxy pour rechercher,
+          reserver, annuler et rafraichir automatiquement.
         </p>
       </div>
     </div>

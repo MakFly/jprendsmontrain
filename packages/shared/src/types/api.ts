@@ -19,6 +19,8 @@ export interface AuthLogoutResponse {
 
 export interface AuthStatusResponse {
   authenticated: boolean;
+  mode?: "live" | "imported";
+  expiresAt?: number;
 }
 
 // --- Station ---

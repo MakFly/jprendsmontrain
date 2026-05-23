@@ -1,0 +1,30 @@
+# Dependencies & build output (reinstalled/rebuilt inside the image)
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+.turbo
+**/.turbo
+
+# Local env & secrets — pass these at run time, never bake them in
+.env
+.env.*
+!.env.production.example
+
+# VCS, tooling, local junk
+.git
+.gitignore
+*.log
+.DS_Store
+.playwright-mcp
+.vscode
+.idea
+
+# Docs/build artifacts not needed in the image
+README.md
+DEPLOY.md
+Makefile
+tsconfig.tsbuildinfo
+**/*.tsbuildinfo
