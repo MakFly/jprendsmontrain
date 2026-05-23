@@ -24,7 +24,7 @@ function CallbackHandler() {
       .then((result) => {
         if (result.success) {
           setAuthenticated();
-          router.replace("/");
+          router.replace("/dashboard");
         } else {
           setError("Echec de l'authentification");
         }

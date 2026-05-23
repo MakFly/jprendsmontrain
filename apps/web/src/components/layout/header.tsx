@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const TITLES: Record<string, string> = {
-  "/": "MAX SNCF",
+  "/dashboard": "MAX SNCF",
   "/search": "Rechercher",
   "/trips": "Mes voyages",
   "/subscription": "Abonnement",

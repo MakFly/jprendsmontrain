@@ -47,8 +47,8 @@ export const viewport: Viewport = {
   // Resize the layout (not just the visual viewport) when the keyboard opens.
   interactiveWidget: "resizes-content",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#00214D" },
-    { media: "(prefers-color-scheme: dark)", color: "#0A1628" },
+    { media: "(prefers-color-scheme: light)", color: "#292524" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0a09" },
   ],
 };
 
