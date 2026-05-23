@@ -1,0 +1,7 @@
+services:
+  proxy:
+    ports:
+      - "3333:3333"
+  web:
+    ports:
+      - "3020:3020"

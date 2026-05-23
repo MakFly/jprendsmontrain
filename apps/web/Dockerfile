@@ -24,6 +24,7 @@ ENV NEXT_PUBLIC_PROXY_URL=$NEXT_PUBLIC_PROXY_URL \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY . .
 RUN cd apps/web && bun run build
 

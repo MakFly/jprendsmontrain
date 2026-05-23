@@ -21,6 +21,7 @@ ENV NODE_ENV=production \
     MIRROR_IDP_PORT=3345 \
     SESSION_STORE_FILE=/data/sessions.json
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/proxy/node_modules ./apps/proxy/node_modules
 COPY package.json bun.lock ./
 COPY packages/shared packages/shared
 COPY apps/proxy apps/proxy
