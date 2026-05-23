@@ -28,8 +28,10 @@ const IDP_ORIGIN = "https://auth.monidentifiant.sncf";
 export const MIRROR_PORT = parseInt(process.env.MIRROR_PORT || "3344", 10);
 export const MIRROR_IDP_PORT = parseInt(process.env.MIRROR_IDP_PORT || "3345", 10);
 
-// Public base the phone uses to reach each mirror (LAN IP). Derived from
-// PWA_ORIGIN's host so it matches whatever the phone is pointed at.
+// Public base the phone uses to reach each mirror.
+// In production behind a reverse proxy (Caddy), set MIRROR_APP_BASE and
+// MIRROR_IDP_BASE to the public HTTPS URLs. Locally, they default to
+// http://<LAN_HOST>:<port> for direct port access.
 function hostFromOrigin(origin: string): string {
   try {
     return new URL(origin).hostname;
@@ -38,8 +40,8 @@ function hostFromOrigin(origin: string): string {
   }
 }
 const LAN_HOST = process.env.MIRROR_HOST || hostFromOrigin(config.pwaOrigin);
-const APP_BASE = `http://${LAN_HOST}:${MIRROR_PORT}`;
-const IDP_BASE = `http://${LAN_HOST}:${MIRROR_IDP_PORT}`;
+const APP_BASE = process.env.MIRROR_APP_BASE || `http://${LAN_HOST}:${MIRROR_PORT}`;
+const IDP_BASE = process.env.MIRROR_IDP_BASE || `http://${LAN_HOST}:${MIRROR_IDP_PORT}`;
 
 // Server-side capture bucket. Single-user local tool → one global bucket. We
 // accumulate every SNCF cookie seen (request Cookie header + response
@@ -48,6 +50,7 @@ const bucket = {
   cookies: new Map<string, string>(), // name -> "name=value"
   ua: "",
   hasAuth: false,
+  finishToken: "",
 };
 
 function rememberCookie(nameValue: string) {
@@ -85,19 +88,27 @@ function rewriteLocation(location: string): string {
   return rewriteAll(location);
 }
 
-// Strip Secure/Domain so the rebound cookie sticks to the http LAN mirror host.
+// Rebind cookies for the mirror host. In production (HTTPS), keep Secure flag.
+const IS_HTTPS_MIRROR = APP_BASE.startsWith("https://");
 function rebindCookie(setCookie: string): string {
-  return setCookie
-    .replace(/;\s*Domain=[^;]+/gi, "")
-    .replace(/;\s*Secure/gi, "")
-    .replace(/;\s*SameSite=None/gi, "; SameSite=Lax");
+  let out = setCookie.replace(/;\s*Domain=[^;]+/gi, "");
+  if (!IS_HTTPS_MIRROR) {
+    out = out.replace(/;\s*Secure/gi, "");
+  }
+  return out.replace(/;\s*SameSite=None/gi, "; SameSite=Lax");
 }
 
 // A floating "return to the app" button injected into mirrored HTML. Once the
 // user has logged in (auth captured), tapping it hands off to /__finish.
+function generateFinishToken(): string {
+  const token = crypto.randomUUID();
+  bucket.finishToken = token;
+  return token;
+}
+
 function finishWidget(): string {
   return `<div id="__maxsncf_finish" style="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#00214D;display:flex;justify-content:center">
-  <a href="/__finish" style="display:block;width:100%;max-width:420px;text-align:center;padding:14px;border-radius:12px;background:#fff;color:#00214D;font:600 15px -apple-system,system-ui,sans-serif;text-decoration:none">✓ J'ai fini de me connecter — revenir à MAX SNCF</a>
+  <a href="/__finish?t=${bucket.finishToken}" style="display:block;width:100%;max-width:420px;text-align:center;padding:14px;border-radius:12px;background:#fff;color:#00214D;font:600 15px -apple-system,system-ui,sans-serif;text-decoration:none">✓ J'ai fini de me connecter — revenir à MAX SNCF</a>
 </div>`;
 }
 
@@ -108,6 +119,14 @@ function makeMirror(selfOrigin: string) {
   // PWA session cookie (host-only → covers all ports on this LAN host), and
   // bounce back to the PWA. Only on the app mirror.
   app.get("/__finish", async (c) => {
+    const t = c.req.query("t") ?? "";
+    if (!t || t !== bucket.finishToken) {
+      return c.html(
+        `<body style="font:16px system-ui;padding:24px;color:#991b1b">Token invalide ou expiré. <a href="/sncf-connect">Recommencer</a></body>`,
+        403,
+      );
+    }
+    bucket.finishToken = "";
     if (!bucket.hasAuth || bucket.cookies.size === 0) {
       return c.html(
         `<body style="font:16px system-ui;padding:24px;color:#991b1b">Connexion SNCF non détectée. Connectez-vous d'abord, puis réessayez. <a href="/sncf-connect">Retour</a></body>`,
@@ -131,14 +150,24 @@ function makeMirror(selfOrigin: string) {
     ];
     if (config.cookieDomainAttr) parts.push(`Domain=${config.cookieDomainAttr}`);
     if (config.cookieSecure) parts.push("Secure");
+    let redirectTo = config.pwaOrigin;
+    try {
+      const u = new URL(redirectTo);
+      if (u.protocol !== "https:" && u.protocol !== "http:") redirectTo = "/";
+    } catch {
+      redirectTo = "/";
+    }
     return new Response(null, {
       status: 302,
-      headers: { Location: config.pwaOrigin, "Set-Cookie": parts.join("; ") },
+      headers: { Location: redirectTo, "Set-Cookie": parts.join("; ") },
     });
   });
 
   app.all("/*", async (c) => {
     const reqUrl = new URL(c.req.url);
+    if (reqUrl.pathname === "/sncf-connect" && !bucket.finishToken) {
+      generateFinishToken();
+    }
     const upstreamUrl = `${selfOrigin}${reqUrl.pathname}${reqUrl.search}`;
 
     const fwd = new Headers();
@@ -182,6 +211,7 @@ function makeMirror(selfOrigin: string) {
     // "return to app" button would hand off an expired session).
     if (selfOrigin === IDP_ORIGIN && reqUrl.pathname.includes("/u/login")) {
       bucket.hasAuth = false;
+      generateFinishToken();
     }
 
     const method = c.req.method;

@@ -225,7 +225,6 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <div className="space-y-5">
-        <SessionPanel />
         <SubscriptionCard />
         <ActionGrid />
         <section className="space-y-3">

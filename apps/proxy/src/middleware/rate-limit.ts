@@ -18,8 +18,9 @@ setInterval(() => {
 }, CLEANUP_INTERVAL);
 
 export const rateLimitMiddleware: MiddlewareHandler = async (c, next) => {
+  const xff = c.req.header("x-forwarded-for");
   const ip =
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    (xff ? xff.split(",").pop()?.trim() : undefined) ??
     c.req.header("x-real-ip") ??
     "unknown";
 

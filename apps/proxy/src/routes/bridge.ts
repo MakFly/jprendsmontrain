@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { Buffer } from "node:buffer";
 import { getCookie, setCookie } from "hono/cookie";
 import { config } from "../config.js";
@@ -8,6 +8,24 @@ import { sessionStore, type ImportedSessionData } from "../lib/session-store.js"
 import { extractXsrfToken } from "../lib/sncf-client.js";
 
 const SNCF_ORIGIN = "https://www.maxactif-tgvinoui.sncf";
+
+function escapeJS(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/</g, "\\x3c").replace(/>/g, "\\x3e");
+}
+
+const BRIDGE_SECRET = process.env.BRIDGE_SECRET || "";
+
+const requireBridgeAuth: MiddlewareHandler = async (c, next) => {
+  if (!BRIDGE_SECRET) return await next();
+  const auth = c.req.header("authorization");
+  if (auth === `Bearer ${BRIDGE_SECRET}`) return await next();
+  const token = getCookie(c, SESSION_COOKIE_NAME);
+  if (token) {
+    const payload = await verifySessionToken(token);
+    if (payload && sessionStore.get(payload.sid)) return await next();
+  }
+  return c.json({ error: "FORBIDDEN", message: "Bridge auth required" }, 403);
+};
 
 // ---------------------------------------------------------------------------
 // Device pairing: copy an existing live session onto another device (the phone)
@@ -62,7 +80,7 @@ export const bridgeRoutes = new Hono()
   // (auth + datadome) plus the exact User-Agent the datadome cookie was issued
   // for. This is the only way to make authenticated/mutating SNCF calls
   // (book / exchange / cancel) work server-side past DataDome.
-  .post("/session", async (c) => {
+  .post("/session", requireBridgeAuth, async (c) => {
     const payload = (await c.req.json().catch(() => null)) as LiveSessionPayload | null;
     if (!payload?.cookies) {
       return c.json({ error: "MISSING_COOKIES" }, 400);
@@ -142,7 +160,7 @@ export const bridgeRoutes = new Hono()
     return c.redirect(config.pwaOrigin);
   })
 
-  .get("/import", async (c) => {
+  .get("/import", requireBridgeAuth, async (c) => {
     const payload = c.req.query("payload");
     if (payload) {
       try {
@@ -188,7 +206,7 @@ export const bridgeRoutes = new Hono()
     return c.html(html);
   })
 
-  .post("/import", async (c) => {
+  .post("/import", requireBridgeAuth, async (c) => {
     const body = await c.req.parseBody();
     const raw = body.payload;
 
@@ -286,11 +304,11 @@ export const bridgeRoutes = new Hono()
   </div>
 
   <script>
-    const PWA = '${config.pwaOrigin}';
+    const PWA = '${escapeJS(config.pwaOrigin)}';
     let sncfWindow = null;
 
     function openSncf() {
-      sncfWindow = window.open('${SNCF_ORIGIN}/sncf-connect', 'sncf_login');
+      sncfWindow = window.open('${escapeJS(SNCF_ORIGIN)}/sncf-connect', 'sncf_login');
       document.getElementById('step1').classList.add('hidden');
       document.getElementById('step2').classList.remove('hidden');
       setStatus('Connectez-vous sur le site SNCF puis revenez ici.', 'info');

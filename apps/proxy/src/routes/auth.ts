@@ -60,7 +60,7 @@ export const authRoutes = new Hono()
     });
   })
 
-  .post("/datadome", zValidator("json", dataDomeSchema), async (c) => {
+  .post("/datadome", requireSession, zValidator("json", dataDomeSchema), async (c) => {
     const { cookies } = c.req.valid("json");
     setDataDomeCookies(cookies);
     return c.json({ success: true, message: "DataDome cookies stored. Retry /auth/init." });

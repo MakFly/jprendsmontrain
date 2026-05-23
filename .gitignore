@@ -3,11 +3,14 @@ dist/
 .turbo/
 .env
 .env.local
+.env.production
+shuttle.yml
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.webp
+!apps/web/public/**/*.png
 .next/
 .DS_Store
 

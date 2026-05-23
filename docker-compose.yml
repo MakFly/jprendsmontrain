@@ -16,6 +16,7 @@ services:
       SESSION_STORE_FILE: /data/sessions.json
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       SNCF_BACKEND_URL: ${SNCF_BACKEND_URL:-https://www.maxactif-tgvinoui.sncf}
+      PWA_ORIGIN: ${PWA_ORIGIN:-${PWA_ORIGINS}}
       # CORS allowlist — the public app origin(s), comma-separated.
       PWA_ORIGINS: ${PWA_ORIGINS:?set PWA_ORIGINS in .env}
       # Parent domain so the session cookie is shared app.<d> ↔ api.<d> (e.g. .example.com)
@@ -23,6 +24,9 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       APP_VERSION: ${APP_VERSION:-2.54.2}
       MIRROR_HOST: ${MIRROR_HOST:-}
+      MIRROR_APP_BASE: ${MIRROR_APP_BASE:-}
+      MIRROR_IDP_BASE: ${MIRROR_IDP_BASE:-}
+      BRIDGE_SECRET: ${BRIDGE_SECRET:-}
     volumes:
       - proxy-data:/data
     expose:
