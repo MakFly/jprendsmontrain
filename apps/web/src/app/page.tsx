@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
+import { TrainLogo } from "@/components/shared/train-logo";
+import { motion, useInView } from "motion/react";
 import {
   ArrowRight,
   CalendarDays,
   Gauge,
+  Github,
   Lock,
   Moon,
   QrCode,
@@ -160,6 +163,150 @@ function FlowArrow({ label }: { label: string }) {
   );
 }
 
+const archNodes = [
+  {
+    id: "pwa",
+    icon: Smartphone,
+    title: "PWA Next.js",
+    sub: "Interface mobile-first installable",
+    border: "border-stone-300 dark:border-stone-700",
+    bg: "bg-stone-50 dark:bg-stone-800",
+  },
+  {
+    id: "proxy",
+    icon: Server,
+    title: "Proxy Hono / Bun",
+    sub: "Session store · CORS · DataDome relay",
+    border: "border-stone-400 dark:border-stone-600",
+    bg: "bg-stone-100 dark:bg-stone-800",
+  },
+  {
+    id: "sncf",
+    icon: Train,
+    title: "API SNCF",
+    sub: "maxactif-tgvinoui.sncf · DataDome",
+    border: "border-dashed border-stone-300 dark:border-stone-700",
+    bg: "bg-stone-50 dark:bg-stone-900",
+    muted: true,
+  },
+] as const;
+
+const archEdges = ["HTTP + JWT", "fetch + cookies SNCF"] as const;
+
+function AnimatedArrow({
+  label,
+  delay,
+}: {
+  label: string;
+  delay: number;
+}) {
+  return (
+    <motion.div
+      className="flex flex-col items-center gap-1"
+      initial={{ opacity: 0, scaleY: 0 }}
+      animate={{ opacity: 1, scaleY: 1 }}
+      transition={{ duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] }}
+      style={{ transformOrigin: "top" }}
+    >
+      <motion.div
+        className="h-6 w-[1px] bg-stone-300 dark:bg-stone-700"
+        initial={{ scaleY: 0 }}
+        animate={{ scaleY: 1 }}
+        transition={{ duration: 0.4, delay: delay + 0.1, ease: "easeOut" }}
+        style={{ transformOrigin: "top" }}
+      />
+      <motion.span
+        className="rounded-md bg-stone-100 px-2.5 py-1 font-mono text-[10px] font-semibold text-stone-500 dark:bg-stone-800 dark:text-stone-400"
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3, delay: delay + 0.3 }}
+      >
+        {label}
+      </motion.span>
+      <motion.div
+        className="h-6 w-[1px] bg-stone-300 dark:bg-stone-700"
+        initial={{ scaleY: 0 }}
+        animate={{ scaleY: 1 }}
+        transition={{ duration: 0.4, delay: delay + 0.4, ease: "easeOut" }}
+        style={{ transformOrigin: "top" }}
+      />
+      <motion.div
+        className="h-0 w-0 border-x-[5px] border-t-[6px] border-x-transparent border-t-stone-300 dark:border-t-stone-700"
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: delay + 0.6 }}
+      />
+    </motion.div>
+  );
+}
+
+function ArchitectureDiagram() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-60px" });
+
+  return (
+    <div ref={ref} className="mt-12 overflow-hidden rounded-2xl border border-stone-200 bg-white p-6 sm:p-10 dark:border-stone-800 dark:bg-stone-900">
+      <div className="flex flex-col items-center gap-6 sm:gap-8">
+        {archNodes.map((node, i) => (
+          <div key={node.id} className="flex w-full flex-col items-center gap-6 sm:gap-8">
+            {i > 0 && isInView && (
+              <AnimatedArrow
+                label={archEdges[i - 1]!}
+                delay={i * 0.5 + 0.2}
+              />
+            )}
+            <motion.div
+              className={`w-full max-w-sm rounded-xl border-2 ${node.border} ${node.bg} px-6 py-5 text-center`}
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={
+                isInView
+                  ? { opacity: 1, y: 0, scale: 1 }
+                  : { opacity: 0, y: 30, scale: 0.95 }
+              }
+              transition={{
+                duration: 0.6,
+                delay: i * 0.5,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
+            >
+              <div className="flex items-center justify-center gap-2.5">
+                <node.icon
+                  className={`h-5 w-5 ${"muted" in node ? "text-stone-400" : "text-stone-600 dark:text-stone-400"}`}
+                />
+                <span
+                  className={`font-display text-base font-bold ${"muted" in node ? "text-stone-500 dark:text-stone-400" : ""}`}
+                >
+                  {node.title}
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+                {node.sub}
+              </p>
+            </motion.div>
+          </div>
+        ))}
+      </div>
+
+      <motion.div
+        className="mt-10 flex flex-wrap justify-center gap-6 border-t border-stone-200 pt-6 text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400"
+        initial={{ opacity: 0 }}
+        animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+        transition={{ duration: 0.5, delay: 1.8 }}
+      >
+        <div className="flex items-center gap-2">
+          <div className="h-[2px] w-5 bg-stone-400" />
+          <span>Connexion directe</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="h-[2px] w-5 border-t-2 border-dashed border-stone-400" />
+          <span>Service tiers</span>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function SectionDivider() {
   return (
     <div className="mx-auto max-w-5xl px-6">
@@ -180,14 +327,14 @@ export default function LandingPage() {
 
         <div className="relative z-10 mx-auto max-w-3xl text-center">
           <Reveal>
-            <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900">
-              <Train className="h-8 w-8 text-stone-700 dark:text-stone-300" />
+            <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-stone-800 dark:bg-stone-900">
+              <TrainLogo className="h-12 w-12 text-stone-700 dark:text-stone-300" />
             </div>
           </Reveal>
 
           <Reveal delay={100}>
             <p className="mb-4 font-mono text-xs font-semibold uppercase tracking-[0.25em] text-stone-500 dark:text-stone-400">
-              Progressive Web App
+              Application auto-hébergée
             </p>
           </Reveal>
 
@@ -196,10 +343,10 @@ export default function LandingPage() {
               className="font-display font-extrabold leading-[0.95] tracking-tight text-stone-900 dark:text-stone-50"
               style={{ fontSize: "clamp(2.5rem, 7vw, 5rem)" }}
             >
-              Votre MAX SNCF,
+              MAX SNCF.
               <br />
               <span className="text-stone-400 dark:text-stone-600">
-                reinvente.
+                Repensé.
               </span>
             </h1>
           </Reveal>
@@ -212,9 +359,9 @@ export default function LandingPage() {
                 lineHeight: 1.7,
               }}
             >
-              Une interface rapide, epuree et installable pour gerer votre
-              abonnement MAX Actif TGV INOUI au quotidien. Auto-hebergee.
-              Privee. Sans compromis.
+              Gérez votre abonnement MAX Actif TGV INOUI depuis une interface
+              rapide, épurée et installable. Hébergée chez vous. Vos données
+              restent les vôtres.
             </p>
           </Reveal>
 
@@ -224,14 +371,14 @@ export default function LandingPage() {
                 href="/dashboard"
                 className="group inline-flex min-h-[48px] items-center gap-2.5 rounded-xl bg-stone-900 px-7 text-sm font-semibold text-white transition-all hover:bg-stone-800 active:scale-[0.98] dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-200"
               >
-                Commencer
+                Accéder au tableau de bord
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
               <a
                 href="#features"
                 className="inline-flex min-h-[48px] items-center gap-2 rounded-xl border border-stone-300 px-7 text-sm font-semibold text-stone-700 transition-all hover:border-stone-400 hover:bg-stone-100 active:scale-[0.98] dark:border-stone-700 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:bg-stone-900"
               >
-                Decouvrir
+                En savoir plus
               </a>
             </div>
           </Reveal>
@@ -346,69 +493,11 @@ export default function LandingPage() {
             className="mt-4 max-w-xl font-display font-bold leading-tight tracking-tight"
             style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.5rem)" }}
           >
-            Comment ca fonctionne.
+            Comment ça fonctionne.
           </h2>
         </Reveal>
 
-        <Reveal delay={150}>
-          <div className="mt-12 overflow-hidden rounded-2xl border border-stone-200 bg-white p-6 sm:p-10 dark:border-stone-800 dark:bg-stone-900">
-            <div className="flex flex-col items-center gap-6 sm:gap-8">
-              {/* PWA */}
-              <div className="w-full max-w-sm rounded-xl border-2 border-stone-300 bg-stone-50 px-6 py-5 text-center dark:border-stone-700 dark:bg-stone-800">
-                <div className="flex items-center justify-center gap-2.5">
-                  <Smartphone className="h-5 w-5 text-stone-500" />
-                  <span className="font-display text-base font-bold">
-                    PWA Next.js
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
-                  Interface mobile-first installable
-                </p>
-              </div>
-
-              <FlowArrow label="HTTP + JWT" />
-
-              {/* Proxy */}
-              <div className="w-full max-w-sm rounded-xl border-2 border-stone-400 bg-stone-100 px-6 py-5 text-center dark:border-stone-600 dark:bg-stone-800">
-                <div className="flex items-center justify-center gap-2.5">
-                  <Server className="h-5 w-5 text-stone-600 dark:text-stone-400" />
-                  <span className="font-display text-base font-bold">
-                    Proxy Hono / Bun
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
-                  Session store &middot; CORS &middot; DataDome relay
-                </p>
-              </div>
-
-              <FlowArrow label="fetch + cookies SNCF" />
-
-              {/* SNCF Backend */}
-              <div className="w-full max-w-sm rounded-xl border-2 border-dashed border-stone-300 bg-stone-50 px-6 py-5 text-center dark:border-stone-700 dark:bg-stone-900">
-                <div className="flex items-center justify-center gap-2.5">
-                  <Train className="h-5 w-5 text-stone-400" />
-                  <span className="font-display text-base font-bold text-stone-500 dark:text-stone-400">
-                    API SNCF
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs text-stone-400 dark:text-stone-500">
-                  maxactif-tgvinoui.sncf &middot; DataDome
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-10 flex flex-wrap justify-center gap-6 border-t border-stone-200 pt-6 text-xs text-stone-500 dark:border-stone-800 dark:text-stone-400">
-              <div className="flex items-center gap-2">
-                <div className="h-[2px] w-5 bg-stone-400" />
-                <span>Connexion directe</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-[2px] w-5 border-t-2 border-dashed border-stone-400" />
-                <span>Service tiers</span>
-              </div>
-            </div>
-          </div>
-        </Reveal>
+        <ArchitectureDiagram />
 
         <div className="mt-10 grid gap-6 sm:grid-cols-3">
           {archFeatures.map((item, i) => (
@@ -528,9 +617,20 @@ export default function LandingPage() {
               MAX SNCF
             </span>
           </div>
-          <p className="text-xs text-stone-400 dark:text-stone-500">
-            Projet personnel &middot; Non affilie a la SNCF
-          </p>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/MakFly/pwa-max-sncf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-stone-400 transition-colors hover:text-stone-600 dark:hover:text-stone-300"
+              aria-label="GitHub"
+            >
+              <Github className="h-5 w-5" />
+            </a>
+            <p className="text-xs text-stone-400 dark:text-stone-500">
+              Projet open source &middot; Non affilié à la SNCF
+            </p>
+          </div>
         </div>
       </footer>
     </div>
