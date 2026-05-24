@@ -1,9 +1,6 @@
 node_modules/
 dist/
 .turbo/
-.env
-.env.local
-.env.production
 shuttle.yml
 *.png
 *.jpg
@@ -22,3 +19,4 @@ shuttle.yml
 
 # instant-grep index
 .ig/
+config.bat
