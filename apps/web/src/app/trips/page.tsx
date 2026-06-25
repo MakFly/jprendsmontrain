@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { useQuery } from "@tanstack/react-query";
 import { reservationApi } from "@/lib/api/reservation";
-import { Train, ArrowRight, ShieldAlert } from "lucide-react";
+import { Train, ArrowRight, ShieldAlert, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +31,7 @@ function station(t: Trip, key: "departureStation" | "arrivalStation") {
 export default function TripsPage() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["trips"],
     queryFn: reservationApi.travelConsultation,
   });
@@ -57,6 +57,20 @@ export default function TripsPage() {
   return (
     <AppShell>
       <div className="space-y-4">
+        {/* Manual refresh (pull-to-refresh also works via AppShell) */}
+        <div className="flex justify-end px-0.5">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            aria-label="Actualiser"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors active:scale-[0.97] disabled:opacity-60"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            Actualiser
+          </button>
+        </div>
+
         {/* Segmented control */}
         <div className="flex rounded-xl border border-border bg-muted p-1">
           {(["upcoming", "past"] as const).map((t) => (
