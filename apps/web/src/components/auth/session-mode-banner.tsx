@@ -6,6 +6,12 @@ import { useAuthStore } from "@/stores/auth-store";
 
 export function SessionModeBanner() {
   const { mode } = useAuthStore();
+  const sessionAlert = useAuthStore((s) => s.sessionAlert);
+
+  // When a disconnection/captcha alert is up, the red SessionAlert already tells
+  // the story. Don't also claim the session is "live" — that contradiction
+  // ("live active" + "expired") is exactly what made the UX feel broken.
+  if (sessionAlert) return null;
 
   if (mode === "live") {
     return (

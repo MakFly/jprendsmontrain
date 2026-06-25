@@ -2,18 +2,28 @@
 // Data (trips, QR, subscription) is persisted separately via the React Query
 // cache in localStorage, so this SW only needs to serve the shell + assets.
 
-// Bump on every cache-shape change: `activate` deletes all other caches, which
-// also evicts any old JS bundle that had a stale NEXT_PUBLIC_PROXY_URL baked in
-// (the cause of "works on desktop, dead on the phone" — the phone served a
-// cached bundle still pointing at localhost:3333).
-const CACHE = "max-sncf-v2";
+// The cache is namespaced by the registration's `?v=` (the per-build version
+// from next.config). Each deploy → new version → new cache; `activate` then
+// deletes every other-version cache, which also evicts any old JS bundle that
+// had a stale NEXT_PUBLIC_PROXY_URL baked in (the cause of "works on desktop,
+// dead on the phone" — the phone served a cached bundle still pointing at
+// localhost:3333).
+const VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
+const CACHE = `max-sncf-${VERSION}`;
 const APP_SHELL = ["/", "/trips", "/search", "/subscription", "/manifest.json"];
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
+  // No skipWaiting() here: a new SW parks in the "waiting" state so the app can
+  // surface a "new version available" prompt. It only takes over when the user
+  // accepts (the page posts SKIP_WAITING below).
   event.waitUntil(
     caches.open(CACHE).then((c) => c.addAll(APP_SHELL).catch(() => {})),
   );
+});
+
+// The update prompt asks the waiting worker to activate immediately.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

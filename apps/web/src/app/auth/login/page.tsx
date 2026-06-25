@@ -7,6 +7,7 @@ import { Train } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const MIRROR_URL = process.env.NEXT_PUBLIC_MIRROR_URL || "http://localhost:3344";
+const PROXY_URL = process.env.NEXT_PUBLIC_PROXY_URL || "http://localhost:3333";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -58,6 +59,15 @@ export default function LoginPage() {
           >
             Se connecter en live SNCF
           </Button>
+
+          {/* Fallback when the mirror flow is blocked by DataDome: the proxy's
+              copy-paste-code page logs in without going through the mirror. */}
+          <a
+            href={`${PROXY_URL}/bridge/login`}
+            className="block text-center text-xs text-muted-foreground underline underline-offset-2"
+          >
+            Connexion bloquee ? Methode alternative (coller le code)
+          </a>
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
