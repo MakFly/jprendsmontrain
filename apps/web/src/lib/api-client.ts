@@ -66,7 +66,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new CaptchaError(captchaUrl);
   }
 
-  if (response.status === 401) {
+  // Session-health signals must reflect the SNCF session, which only real data
+  // calls exercise. /auth/* are proxy control-plane endpoints that answer
+  // 200/401 on the proxy JWT alone — a refresh/status 200 would WRONGLY clear
+  // the "SNCF disconnected" banner (and a control-plane 401 wrongly raise it).
+  // So drive the banner only from data calls; let /auth/* stay silent.
+  const isControlPlane = path.startsWith("/auth/");
+
+  if (response.status === 401 && !isControlPlane) {
     sessionExpiredHandler?.();
   }
 
@@ -74,7 +81,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new ApiError(response.status, data);
   }
 
-  sessionOkHandler?.();
+  if (!isControlPlane) sessionOkHandler?.();
   return data as T;
 }
 

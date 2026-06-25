@@ -1,9 +1,10 @@
 .DEFAULT_GOAL := help
 
 BUN ?= $(shell command -v bun 2>/dev/null || printf "%s/.bun/bin/bun" "$$HOME")
-DEV_PORTS := 3333 3020
+# 3333 = proxy API, 3020 = web, 3344/3345 = SNCF login mirrors (same proxy process).
+DEV_PORTS := 3333 3020 3344 3345
 
-.PHONY: help check-bun ensure-env install dev dev-proxy dev-web typecheck build kill clean
+.PHONY: help check-bun ensure-env ensure-deps install dev dev-proxy dev-web typecheck build kill clean
 
 help:
 	@echo "Available targets:"
@@ -28,23 +29,29 @@ ensure-env:
 		echo "Created .env from .env.example"; \
 	fi
 
+ensure-deps: check-bun
+	@if [ ! -d node_modules ]; then \
+		echo "node_modules missing, installing dependencies..."; \
+		$(MAKE) install; \
+	fi
+
 install: check-bun ensure-env
 	$(BUN) install --frozen-lockfile
 
-dev: check-bun ensure-env kill
+dev: ensure-env ensure-deps kill
 	@echo "Starting proxy (3333) + web (3020) through Turbo..."
 	$(BUN) run dev
 
-dev-proxy: check-bun ensure-env
+dev-proxy: ensure-env ensure-deps
 	$(BUN) run --filter @max-sncf/proxy dev
 
-dev-web: check-bun
+dev-web: ensure-deps
 	$(BUN) run --filter @max-sncf/web dev
 
-typecheck: check-bun
+typecheck: ensure-deps
 	$(BUN) run typecheck
 
-build: check-bun
+build: ensure-deps
 	$(BUN) run build
 
 kill:

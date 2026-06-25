@@ -538,8 +538,8 @@ export default function LandingPage() {
             >
               Aucune base de donnees externe, aucun analytics tiers, aucune
               telemetrie. L&apos;application tourne sur votre propre serveur,
-              derriere votre propre domaine. Les sessions sont stockees en
-              memoire et expirent automatiquement.
+              derriere votre propre domaine. Les sessions sont stockees sur
+              votre serveur et expirent automatiquement.
             </p>
           </Reveal>
 

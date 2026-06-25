@@ -4,9 +4,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { customerApi } from "@/lib/api/customer";
+import { SessionExpiredCard } from "@/components/auth/session-expired-card";
 
 export default function InvoicesPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["invoices"],
     queryFn: customerApi.invoices,
   });
@@ -17,7 +18,11 @@ export default function InvoicesPage() {
       <div className="mx-auto max-w-lg space-y-3">
         {isLoading && <div className="h-24 animate-pulse rounded-xl bg-muted" />}
 
-        {!isLoading && invoices.length === 0 && (
+        {!isLoading && isError && !data && (
+          <SessionExpiredCard label="Factures indisponibles" />
+        )}
+
+        {!isLoading && !isError && invoices.length === 0 && (
           <div className="rounded-xl border border-dashed border-border p-6 text-center">
             <Receipt className="mx-auto h-8 w-8 text-muted-foreground" />
             <p className="mt-2 text-sm text-muted-foreground">

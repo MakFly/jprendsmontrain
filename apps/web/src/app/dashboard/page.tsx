@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { SessionExpiredCard } from "@/components/auth/session-expired-card";
 
 function text(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim().length > 0 ? value : fallback;
@@ -85,13 +86,18 @@ function SessionPanel() {
 }
 
 function SubscriptionCard() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["subscription"],
     queryFn: subscriptionApi.summary,
   });
 
   if (isLoading) {
     return <div className="skeleton-sweep h-36 rounded-2xl bg-muted" />;
+  }
+
+  // No cached data + a failed read = disconnected, not "no subscription".
+  if (isError && !data) {
+    return <SessionExpiredCard label="Abonnement indisponible" />;
   }
 
   const sub = (data ?? {}) as Record<string, unknown>;
@@ -155,7 +161,7 @@ function ActionGrid() {
 }
 
 function UpcomingTrips() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["trips"],
     queryFn: reservationApi.travelConsultation,
   });
@@ -168,6 +174,10 @@ function UpcomingTrips() {
         ))}
       </div>
     );
+  }
+
+  if (isError && !data) {
+    return <SessionExpiredCard label="Voyages indisponibles" />;
   }
 
   const travels = (data?.travels ?? []) as Array<Record<string, unknown>>;

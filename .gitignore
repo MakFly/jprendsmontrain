@@ -20,3 +20,10 @@ shuttle.yml
 # instant-grep index
 .ig/
 config.bat
+
+# Local env files hold secrets (SESSION_SECRET). Keep only the *.example templates.
+.env
+.env.local
+.env.production
+!.env.example
+!.env.production.example

@@ -169,7 +169,7 @@ pwa-max-sncf/
 ## Security
 
 - All traffic to SNCF goes through your self-hosted proxy — credentials never touch third parties
-- Sessions are encrypted with `SESSION_SECRET` and stored server-side
+- Session tokens are signed with `SESSION_SECRET`; session data is stored server-side on disk (`~/.cache/max-sncf/sessions.json`), surviving proxy restarts
 - CORS is locked to your configured origins
 - Rate limiting on all proxy endpoints
 - Secure cookies with `HttpOnly`, `SameSite=Lax`, optional `Secure` flag

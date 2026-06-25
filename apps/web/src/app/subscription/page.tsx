@@ -6,6 +6,7 @@ import { subscriptionApi } from "@/lib/api/subscription";
 import { QrCode } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
+import { SessionExpiredCard } from "@/components/auth/session-expired-card";
 
 function val(v: unknown) {
   return typeof v === "string" || typeof v === "number" ? String(v) : "";
@@ -14,7 +15,7 @@ function val(v: unknown) {
 export default function SubscriptionPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["subscription"],
     queryFn: subscriptionApi.summary,
   });
@@ -55,6 +56,10 @@ export default function SubscriptionPage() {
     <AppShell>
       <div className="space-y-5">
         {isLoading && <div className="skeleton-sweep h-56 rounded-2xl bg-muted" />}
+
+        {!isLoading && isError && !sub && (
+          <SessionExpiredCard label="Abonnement indisponible" />
+        )}
 
         {sub && (
           <>
