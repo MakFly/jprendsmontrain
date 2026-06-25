@@ -103,7 +103,13 @@ export default function SearchPage() {
   const search = useMutation({ mutationFn: reservationApi.searchTravels });
   const book = useMutation({
     mutationFn: (travelId: string) => reservationApi.bookTravel({ travelId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["trips"] }),
+    // refetchType "all" refetches the trips query NOW, even though it's inactive
+    // (we're on the Search tab, so neither Trips nor the dashboard is mounted).
+    // The default "active" would only mark it stale, leaving the user to see the
+    // pre-booking list until a later mount-refetch — i.e. "it doesn't show up
+    // right away". Eager refetch warms the cache so it's there on navigation.
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["trips"], refetchType: "all" }),
   });
 
   const results = (search.data?.travels ?? []) as Travel[];
